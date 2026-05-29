@@ -5,7 +5,8 @@
 
 import { useEffect, useRef, useState } from "react";
 import { Icon, PhaseStepper } from "@/components/ui";
-import { FeedPanel, BrowserPreview, FRAME_ORDER } from "@/components/panels";
+import { runLiveAudit } from "@/lib/live-audit";
+import { FeedPanel, BrowserPreview } from "@/components/panels";
 import {
   Sidebar,
   TopNav,
@@ -32,6 +33,7 @@ const STORE_KEY = "invariant_run_v1";
 
 type RunStatus = "idle" | "running" | "paused" | "done";
 type ViewId = "live" | "findings" | "tests" | "history";
+type RunMode = "live" | "demo";
 
 const fmtClock = (sec: number) =>
   `${String(Math.floor(sec / 60)).padStart(2, "0")}:${String(
@@ -51,11 +53,18 @@ export default function DashboardApp() {
   const [elapsed, setElapsed] = useState(0);
   const [sel, setSel] = useState<Finding | null>(null);
   const [toast, setToast] = useState<string | null>(null);
+  const [mode, setMode] = useState<RunMode>("live");
 
   const idx = useRef(0);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const clock = useRef<ReturnType<typeof setInterval> | null>(null);
   const elapsedRef = useRef(0);
+  const runKind = useRef<RunMode>("demo");
+  const liveAbort = useRef<AbortController | null>(null);
+  // mirror of accumulated run state, so finish() can persist either mode
+  const snap = useRef<{ events: RunEventWithTs[]; captured: FrameId[]; findings: string[]; frame: FrameId }>(
+    { events: [], captured: [], findings: [], frame: "home" },
+  );
 
   /* ---- hydrate a finished run on load (survives refresh during a pitch) ---- */
   useEffect(() => {
@@ -84,6 +93,7 @@ export default function DashboardApp() {
     return () => {
       if (timer.current) clearTimeout(timer.current);
       if (clock.current) clearInterval(clock.current);
+      if (liveAbort.current) liveAbort.current.abort();
     };
   }, []);
 
@@ -95,36 +105,10 @@ export default function DashboardApp() {
     }, 100);
   };
 
-  const finish = () => {
-    if (clock.current) clearInterval(clock.current);
-    setStatus("done");
-    setTimeout(() => {
-      setEvents((evs) => {
-        try {
-          localStorage.setItem(
-            STORE_KEY,
-            JSON.stringify({
-              events: evs,
-              frame: "orderPaid",
-              captured: FRAME_ORDER,
-              findings: FINDINGS.map((f) => f.id),
-            }),
-          );
-        } catch {
-          /* ignore */
-        }
-        return evs;
-      });
-    }, 0);
-  };
-
-  const step = () => {
-    if (idx.current >= RUN.length) {
-      finish();
-      return;
-    }
-    const e = RUN[idx.current];
-    setEvents((prev) => [...prev, { ...e, ts: fmtClock(elapsedRef.current) }]);
+  /* ---- apply one RunEvent's side-effects (shared by scripted + live) ---- */
+  const pushEvent = (e: RunEventWithTs) => {
+    setEvents((prev) => [...prev, e]);
+    snap.current.events = [...snap.current.events, e];
     if (e.phase) {
       setPhase(e.phase);
       setPhasesSeen((s) => new Set(s).add(e.phase!));
@@ -132,24 +116,64 @@ export default function DashboardApp() {
     if (e.frame) {
       const fr = e.frame;
       setFrame(fr);
+      snap.current.frame = fr;
+      if (!snap.current.captured.includes(fr)) snap.current.captured.push(fr);
       setCaptured((c) => (c.includes(fr) ? c : [...c, fr]));
     }
     if (e.finding) {
       const f = FINDINGS.find((x) => x.id === e.finding);
-      if (f) setFindings((prev) => (prev.find((p) => p.id === f.id) ? prev : [...prev, f]));
+      if (f) {
+        if (!snap.current.findings.includes(f.id)) snap.current.findings.push(f.id);
+        setFindings((prev) => (prev.find((p) => p.id === f.id) ? prev : [...prev, f]));
+      }
     }
     if (e.test) setTestsUnlocked(true);
+  };
+
+  const persist = () => {
+    try {
+      localStorage.setItem(
+        STORE_KEY,
+        JSON.stringify({
+          events: snap.current.events,
+          frame: snap.current.frame || "orderPaid",
+          captured: snap.current.captured,
+          findings: snap.current.findings,
+        }),
+      );
+    } catch {
+      /* ignore */
+    }
+  };
+
+  const finish = () => {
+    if (clock.current) clearInterval(clock.current);
+    if (liveAbort.current) liveAbort.current.abort();
+    setStatus("done");
+    setTimeout(persist, 0);
+  };
+
+  /* ---- scripted demo engine (deterministic, offline fallback) ---- */
+  const step = () => {
+    if (idx.current >= RUN.length) {
+      finish();
+      return;
+    }
+    const e = RUN[idx.current];
+    pushEvent({ ...e, ts: fmtClock(elapsedRef.current) });
     const dur = e.dur || 1000;
     idx.current++;
     timer.current = setTimeout(step, dur);
   };
 
-  const launch = () => {
+  const resetRun = () => {
     if (timer.current) clearTimeout(timer.current);
     if (clock.current) clearInterval(clock.current);
+    if (liveAbort.current) liveAbort.current.abort();
     localStorage.removeItem(STORE_KEY);
     idx.current = 0;
     elapsedRef.current = 0;
+    snap.current = { events: [], captured: [], findings: [], frame: "home" };
     setEvents([]);
     setPhase(null);
     setPhasesSeen(new Set());
@@ -162,19 +186,56 @@ export default function DashboardApp() {
     setView("live");
     setSel(null);
     startClock();
+  };
+
+  const launchScripted = () => {
+    runKind.current = "demo";
+    resetRun();
     timer.current = setTimeout(step, 350);
+  };
+
+  /* ---- live engine: real Claude driving the shop via /api/audit ---- */
+  const launchLive = () => {
+    runKind.current = "live";
+    resetRun();
+    const ctrl = new AbortController();
+    liveAbort.current = ctrl;
+    runLiveAudit({
+      signal: ctrl.signal,
+      onEvent: (e) => pushEvent({ ...e, ts: fmtClock(elapsedRef.current) }),
+      onDone: finish,
+      onFallback: (reason) => {
+        if (ctrl.signal.aborted) return;
+        // live unavailable → seamlessly play the deterministic demo instead
+        showToast("Live agent unavailable — playing demo run");
+        // eslint-disable-next-line no-console
+        console.warn("[invariant] live audit fell back:", reason);
+        launchScripted();
+      },
+    });
+  };
+
+  const launch = () => {
+    if (mode === "demo") launchScripted();
+    else launchLive();
   };
 
   const pause = () => {
     if (timer.current) clearTimeout(timer.current);
     if (clock.current) clearInterval(clock.current);
+    if (liveAbort.current) liveAbort.current.abort();
     setStatus("paused");
   };
 
   const resume = () => {
     setStatus("running");
     startClock();
-    timer.current = setTimeout(step, 250);
+    if (runKind.current === "live") {
+      // the stream can't be paused server-side; restart a fresh live run
+      launchLive();
+    } else {
+      timer.current = setTimeout(step, 250);
+    }
   };
 
   const showToast = (msg: string) => {
@@ -218,7 +279,7 @@ export default function DashboardApp() {
         <div className="workspace">
           {view === "live" &&
             (status === "idle" && events.length === 0 ? (
-              <AuditHero onLaunch={launch} />
+              <AuditHero onLaunch={launch} mode={mode} setMode={setMode} />
             ) : (
               <LiveView
                 status={status}
@@ -278,7 +339,15 @@ export default function DashboardApp() {
 }
 
 /* ---------- New Audit hero ---------- */
-function AuditHero({ onLaunch }: { onLaunch: () => void }) {
+function AuditHero({
+  onLaunch,
+  mode,
+  setMode,
+}: {
+  onLaunch: () => void;
+  mode: RunMode;
+  setMode: (m: RunMode) => void;
+}) {
   const [url, setUrl] = useState(TARGET);
   return (
     <div className="audit-hero">
@@ -292,6 +361,30 @@ function AuditHero({ onLaunch }: { onLaunch: () => void }) {
           business rules that must hold, then attacks each one until something
           contradicts itself.
         </p>
+        <div className="mode-toggle" role="tablist" aria-label="Run mode">
+          <button
+            role="tab"
+            aria-selected={mode === "live"}
+            className={"mode-opt" + (mode === "live" ? " on" : "")}
+            onClick={() => setMode("live")}
+          >
+            <span className="mode-main">
+              <Icon name="bolt" size={12} /> Live agent
+            </span>
+            <span className="mode-sub">Claude, real-time</span>
+          </button>
+          <button
+            role="tab"
+            aria-selected={mode === "demo"}
+            className={"mode-opt" + (mode === "demo" ? " on" : "")}
+            onClick={() => setMode("demo")}
+          >
+            <span className="mode-main">
+              <Icon name="play" size={12} /> Demo run
+            </span>
+            <span className="mode-sub">Deterministic replay</span>
+          </button>
+        </div>
         <div className="audit-input-row">
           <div className="field">
             <Icon name="dot" size={12} style={{ color: "var(--acc)" }} />

@@ -461,3 +461,76 @@ h1,h2,h3,h4 { margin: 0; font-weight: 600; letter-spacing: -0.02em; line-height:
   padding: 9px 16px; border-radius: 9px; display: flex; align-items: center; gap: 8px; box-shadow: var(--shadow-2);
   animation: toastIn .25s ease both; }
 @keyframes toastIn { from { opacity: 0; transform: translate(-50%, 8px); } to { opacity: 1; transform: translate(-50%, 0); } }
+
+/* ---------- run mode toggle (live vs demo) ---------- */
+.mode-toggle { display: flex; gap: 10px; justify-content: center; margin: 0 0 18px; }
+.mode-opt { flex: 1; max-width: 210px; display: flex; flex-direction: column; align-items: center; gap: 3px;
+  padding: 11px 14px; border-radius: 10px; border: 1px solid var(--line-2); background: var(--bg-1);
+  color: var(--tx-1); cursor: pointer; transition: all .14s ease; font-family: var(--font); }
+.mode-opt .mode-main { display: inline-flex; align-items: center; gap: 7px; font-size: 13px; font-weight: 500; }
+.mode-opt .mode-sub { font-family: var(--mono); font-size: 10px; color: var(--tx-3); letter-spacing: .01em; }
+.mode-opt:hover { border-color: var(--line-3); color: var(--tx-0); }
+.mode-opt.on { border-color: var(--acc-line); background: var(--acc-soft); color: var(--acc); }
+.mode-opt.on .mode-sub { color: var(--acc-dim); }
+
+/* ============================================================
+   RESPONSIVE — the dashboard shell (landing/shop/architecture
+   already ship their own breakpoints).
+   ============================================================ */
+
+/* tablet & down: stack the live grid, let the workspace scroll */
+@media (max-width: 1024px) {
+  .workspace { overflow-y: auto; }
+  .live { height: auto; }
+  .live-grid { display: flex; flex-direction: column; gap: 14px; }
+  .live-grid > .panel { min-height: 440px; }      /* agent feed */
+  .feed-scroll { max-height: 56vh; }
+  .live-col > .panel.grow { min-height: 300px; }   /* findings */
+  .drawer { width: 460px; }
+  .dr-ea { grid-template-columns: 1fr; }
+}
+
+/* phone: sidebar becomes a horizontal bar, everything flows vertically */
+@media (max-width: 720px) {
+  .app { flex-direction: column; height: auto; min-height: 100dvh; overflow: visible; }
+
+  .sidebar { width: 100%; height: auto; flex-direction: row; align-items: center; gap: 4px;
+    padding: 8px 10px; border-right: none; border-bottom: 1px solid var(--line);
+    overflow-x: auto; position: sticky; top: 0; z-index: 35; }
+  .sidebar::-webkit-scrollbar { display: none; }
+  .side-brand { padding: 6px 10px 6px 4px; flex: none; }
+  .side-brand .side-ver { display: none; }
+  .side-label, .side-foot { display: none; }
+  .side-group { margin-top: 0; display: flex; align-items: center; gap: 4px; flex: none; }
+  .nav-item { height: 34px; white-space: nowrap; padding: 0 11px; }
+  .nav-item.active::before { display: none; }
+  .nav-item .count { margin-left: 6px; }
+
+  .main { min-height: 0; }
+  .topnav { height: 50px; padding: 0 14px; gap: 10px; }
+  .topnav .crumb span:first-child, .topnav .crumb .sep { display: none; }
+  .workspace { height: auto; overflow: visible; padding: 14px; }
+
+  .run-header { flex-wrap: wrap; gap: 10px 14px; }
+  .run-sep { display: none; }
+  .run-header > .row { margin-left: 0 !important; width: 100%; }
+
+  .bc-viewport { height: 300px; }
+  .live-grid > .panel { min-height: 460px; }
+  .feed-scroll { max-height: none; }
+
+  .drawer { width: 100%; max-width: 100vw; }
+  .drawer-body { padding: 16px; }
+
+  .audit-card h2 { font-size: 22px; }
+  .audit-card p { font-size: 13.5px; }
+  .audit-input-row { flex-direction: column; }
+  .audit-input-row .btn { height: 44px; }
+  .mode-toggle { flex-direction: column; }
+  .mode-opt { max-width: none; flex-direction: row; justify-content: center; gap: 8px; }
+
+  /* findings / tests / history views */
+  .view-scroll > .panel { overflow-x: auto !important; }
+  .tbl th, .tbl td { padding-left: 10px; padding-right: 10px; }
+  .test-tabs { overflow-x: auto; flex-wrap: nowrap; }
+}

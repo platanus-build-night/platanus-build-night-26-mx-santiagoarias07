@@ -102,7 +102,7 @@ export function Sidebar({
           <span className="av">A</span>
           <div className="col" style={{ gap: 1 }}>
             <span style={{ color: "var(--tx-0)", fontSize: 12.5 }}>
-              claude-sonnet-4.5
+              claude-sonnet-4.6
             </span>
             <span
               className="mono"
