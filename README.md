@@ -68,12 +68,14 @@ Then it attacks each rule until something contradicts itself. When a contradicti
 | Target | Category | Live agent |
 |--------|----------|-----------|
 | **Northwind** | E-commerce checkout | ✅ |
-| **Orbit** | SaaS / Billing | Demo only |
-| **Flux** | Banking / Fintech | Demo only |
+| **Orbit** | SaaS / Billing | ✅ |
+| **Flux** | Banking / Fintech | ✅ |
 
-Each target has seeded invariant violations that the agent finds and reports.
+Each target has its own stateful engine with seeded invariant violations. Claude audits all three through tool use — no browser, no external network.
 
-### Seeded bugs (Northwind / ecommerce)
+### Seeded bugs (per target)
+
+**Northwind (e-commerce)**
 
 | Code | Invariant | Bug |
 |------|-----------|-----|
@@ -81,13 +83,31 @@ Each target has seeded invariant violations that the agent finds and reports.
 | `COUPON_STACK` | coupon redeemable once | Same coupon stacks on every submit |
 | `UNPAID_ORDER` | no PAID order without capture | Mid-checkout refresh confirms order with $0 captured |
 
-### Output
+**Orbit (SaaS billing)**
 
-For each finding the agent produces:
-- Violated invariant (one sentence)
-- Expected vs. actual (side by side)
-- Reproduction steps (numbered)
-- **Playwright regression test** (ready to drop into your suite)
+| Code | Invariant | Bug |
+|------|-----------|-----|
+| `TRIAL_RESET` | trial expiry never resets | Changing plan mid-trial resets `trial_ends_at` to now+14d |
+| `API_NOT_REVOKED` | downgrade revokes premium access | API key returns 200 on premium endpoints after downgrade to Free |
+| `SEAT_OVERFLOW` | seats ≤ plan limit | 6th invite accepted on a 5-seat plan |
+
+**Flux (banking)**
+
+| Code | Invariant | Bug |
+|------|-----------|-----|
+| `NEGATIVE_TRANSFER` | amount > 0 | Negative transfer accepted — money flows in wrong direction |
+| `DUPLICATE_TRANSFER` | duplicate ref rejected | Same reference accepted twice → double debit |
+| `OVERDRAFT_FEE` | balance never < $0 | Fee applied after balance check → overdraft |
+
+### Dual output: security findings + UX recommendations
+
+Every audit produces two classes of output, color-coded in the live feed:
+
+🔴 **Invariant violations** (red/amber) — confirmed business-logic bugs with expected vs. actual, reproduction steps, and a generated Playwright regression test.
+
+💡 **UX suggestions** (blue) — friction points Claude observes while exploring the interface: missing loading states, disabled buttons that invite duplicate clicks, undisclosed fees. These don't break invariants but hurt conversion.
+
+Each audit emits up to 3 UX suggestions alongside the security findings — a dual report that protects both revenue integrity and conversion rate.
 
 ---
 
