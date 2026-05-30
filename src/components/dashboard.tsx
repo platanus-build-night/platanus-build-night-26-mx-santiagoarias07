@@ -188,6 +188,28 @@ export default function DashboardApp() {
     startClock();
   };
 
+  /* Volver al hero de selección sin lanzar ninguna corrida */
+  const goToHero = () => {
+    if (timer.current) clearTimeout(timer.current);
+    if (clock.current) clearInterval(clock.current);
+    if (liveAbort.current) liveAbort.current.abort();
+    localStorage.removeItem(STORE_KEY);
+    idx.current = 0;
+    elapsedRef.current = 0;
+    snap.current = { events: [], captured: [], findings: [], frame: "home" };
+    setEvents([]);
+    setPhase(null);
+    setPhasesSeen(new Set());
+    setFrame("home");
+    setCaptured([]);
+    setFindings([]);
+    setTestsUnlocked(false);
+    setElapsed(0);
+    setStatus("idle");
+    setView("live");
+    setSel(null);
+  };
+
   const launchScripted = () => {
     runKind.current = "demo";
     resetRun();
@@ -296,6 +318,7 @@ export default function DashboardApp() {
                 onPause={pause}
                 onResume={resume}
                 onRerun={launch}
+                onNewAudit={goToHero}
                 setFrame={setFrame}
               />
             ))}
@@ -479,6 +502,7 @@ type LiveViewProps = {
   onPause: () => void;
   onResume: () => void;
   onRerun: () => void;
+  onNewAudit: () => void;
   setFrame: (f: FrameId) => void;
 };
 
@@ -530,6 +554,9 @@ function LiveView(p: LiveViewProps) {
               </button>
             </>
           )}
+          <button className="btn btn-sm btn-ghost" onClick={p.onNewAudit} title="Back to audit selector">
+            <Icon name="audit" size={13} /> New audit
+          </button>
         </div>
       </div>
 
