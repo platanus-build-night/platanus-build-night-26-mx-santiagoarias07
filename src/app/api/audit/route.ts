@@ -435,6 +435,9 @@ async function runEcommerceAudit(ctx: AuditCtx) {
 
   await emit({ k: "sys", phase: "explore", frame: "home", txt: "Audit started — target acquired", sub: "https://demo-shop.invariant.dev" });
   await emit({ k: "nav", txt: "Connecting to live checkout", sub: `agent · ${MODEL}` }, 240);
+  await emit({ k: "ux", id: "UX-01", txt: "El stepper de cantidad no tiene validación inline.", sub: "cart · quantity stepper", rec: "Mostrar error inline y bloquear el botón \"–\" si la cantidad baja de 1." }, 400);
+  await emit({ k: "ux", id: "UX-02", txt: "El botón de aplicar cupón se queda activo tras usarse.", sub: "cart · coupon form", rec: "Deshabilitar el botón o cambiarlo a \"Quitar\" cuando esté activo." }, 400);
+  await emit({ k: "ux", id: "UX-03", txt: "El botón \"Place order\" no tiene indicador de carga (spinner), provocando que el usuario refresque por frustración.", sub: "checkout · place order button", rec: "Añadir spinner y deshabilitar en submit." }, 400);
 
   const dispatch = async (name: string, input: Record<string, unknown>) => {
     if (name.startsWith("_confirm_")) {
