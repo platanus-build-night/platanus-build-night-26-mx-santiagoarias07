@@ -225,6 +225,7 @@ export default function DashboardApp() {
     liveAbort.current = ctrl;
     runLiveAudit({
       signal: ctrl.signal,
+      targetId: targetData.current.id,
       onEvent: (e) => pushEvent({ ...e, ts: fmtClock(elapsedRef.current) }),
       onDone: finish,
       onFallback: (reason) => {
@@ -240,8 +241,7 @@ export default function DashboardApp() {
   const launch = (targetId?: string) => {
     const tid = targetId || selectedTargetId;
     targetData.current = DEMO_TARGETS[tid] ?? DEMO_TARGETS["ecommerce"];
-    // Non-ecommerce targets don't have a live agent — use scripted
-    if (mode === "live" && targetData.current.liveEnabled) launchLive();
+    if (mode === "live") launchLive();
     else launchScripted();
   };
 
@@ -394,7 +394,6 @@ function AuditHero({
   setSelectedTargetId: (id: string) => void;
 }) {
   const selected = DEMO_TARGETS[selectedTargetId] ?? DEMO_TARGETS["ecommerce"];
-  const canLive = selected.liveEnabled;
 
   return (
     <div className="audit-hero">
@@ -428,10 +427,7 @@ function AuditHero({
               <div style={{ fontSize: 13, fontWeight: 600, color: selectedTargetId === t.id ? "var(--acc)" : "var(--tx-0)" }}>{t.name}</div>
               <div style={{ fontSize: 11, color: "var(--tx-2)", fontFamily: "var(--mono)", marginTop: 2 }}>{t.category}</div>
               <div style={{ display: "flex", alignItems: "center", gap: 5, marginTop: 8 }}>
-                {t.liveEnabled
-                  ? <span style={{ fontSize: 10, padding: "1px 6px", borderRadius: 999, background: "var(--ok-soft)", color: "var(--ok)", border: "1px solid rgba(91,191,155,0.3)", fontFamily: "var(--mono)" }}>Live ✓</span>
-                  : <span style={{ fontSize: 10, padding: "1px 6px", borderRadius: 999, background: "var(--bg-3)", color: "var(--tx-3)", border: "1px solid var(--line-2)", fontFamily: "var(--mono)" }}>Demo</span>
-                }
+                <span style={{ fontSize: 10, padding: "1px 6px", borderRadius: 999, background: "var(--ok-soft)", color: "var(--ok)", border: "1px solid rgba(91,191,155,0.3)", fontFamily: "var(--mono)" }}>Live ✓</span>
               </div>
             </div>
           ))}
@@ -442,20 +438,18 @@ function AuditHero({
           <button
             role="tab"
             aria-selected={mode === "live"}
-            className={"mode-opt" + (mode === "live" ? " on" : "") + (!canLive ? " disabled" : "")}
-            onClick={() => canLive && setMode("live")}
-            title={!canLive ? "Live agent only available for Northwind" : undefined}
-            style={!canLive ? { opacity: 0.45, cursor: "not-allowed" } : {}}
+            className={"mode-opt" + (mode === "live" ? " on" : "")}
+            onClick={() => setMode("live")}
           >
             <span className="mode-main">
               <Icon name="bolt" size={12} /> Live agent
             </span>
-            <span className="mode-sub">{canLive ? "Claude, real-time" : "ecommerce only"}</span>
+            <span className="mode-sub">Claude, real-time</span>
           </button>
           <button
             role="tab"
             aria-selected={mode === "demo"}
-            className={"mode-opt" + (mode === "demo" || !canLive ? " on" : "")}
+            className={"mode-opt" + (mode === "demo" ? " on" : "")}
             onClick={() => setMode("demo")}
           >
             <span className="mode-main">

@@ -11,19 +11,20 @@ export type LiveEvent = RunEvent & { fallback?: boolean };
 
 type RunOpts = {
   signal: AbortSignal;
+  targetId?: string;
   onEvent: (e: RunEvent) => void;
   onDone: () => void;
   /** The server has no key / errored mid-run — caller should play the demo. */
   onFallback: (reason: string) => void;
 };
 
-export async function runLiveAudit({ signal, onEvent, onDone, onFallback }: RunOpts) {
+export async function runLiveAudit({ signal, targetId = "ecommerce", onEvent, onDone, onFallback }: RunOpts) {
   let res: Response;
   try {
     res = await fetch("/api/audit", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ target: "demo-shop.invariant.dev" }),
+      body: JSON.stringify({ targetId }),
       signal,
     });
   } catch (e) {
