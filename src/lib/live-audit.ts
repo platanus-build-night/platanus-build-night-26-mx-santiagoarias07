@@ -42,6 +42,23 @@ export async function runLiveAudit({ signal, targetId = "ecommerce", onEvent, on
   let buf = "";
   let sawDone = false;
 
+  const processFrame = (frame: string): "fallback" | void => {
+    const line = frame.split("\n").find((l) => l.startsWith("data:"));
+    if (!line) return;
+    let e: LiveEvent;
+    try {
+      e = JSON.parse(line.slice(5).trim());
+    } catch {
+      return;
+    }
+    if (e.fallback) {
+      onFallback(e.txt || "live run unavailable");
+      return "fallback";
+    }
+    onEvent(e);
+    if (e.done) sawDone = true;
+  };
+
   try {
     for (;;) {
       const { done, value } = await reader.read();
@@ -52,20 +69,7 @@ export async function runLiveAudit({ signal, targetId = "ecommerce", onEvent, on
       buf = frames.pop() ?? "";
 
       for (const frame of frames) {
-        const line = frame.split("\n").find((l) => l.startsWith("data:"));
-        if (!line) continue;
-        let e: LiveEvent;
-        try {
-          e = JSON.parse(line.slice(5).trim());
-        } catch {
-          continue;
-        }
-        if (e.fallback) {
-          onFallback(e.txt || "live run unavailable");
-          return;
-        }
-        onEvent(e);
-        if (e.done) sawDone = true;
+        if (processFrame(frame) === "fallback") return;
       }
     }
   } catch (e) {
@@ -74,6 +78,11 @@ export async function runLiveAudit({ signal, targetId = "ecommerce", onEvent, on
       onFallback(e instanceof Error ? e.message : "stream error");
       return;
     }
+  }
+
+  // Flush any event that arrived without a trailing \n\n before the stream closed.
+  if (!sawDone && buf.trim()) {
+    if (processFrame(buf) === "fallback") return;
   }
 
   if (sawDone) onDone();
