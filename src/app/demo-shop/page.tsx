@@ -209,15 +209,24 @@ export default function DemoShopPage() {
 }
 
 const shopPageCss = `
-  .target-bar { display: flex; align-items: center; gap: 12px; padding: 12px 22px; border-bottom: 1px solid var(--line);
-    background: var(--bg-1); position: sticky; top: 0; z-index: 5; }
-  .target-bar .ttl { font-size: 13.5px; font-weight: 500; }
-  .target-bar .mono { color: var(--tx-2); font-size: 12px; }
-  .wrap { max-width: 980px; margin: 0 auto; padding: 28px 22px 60px; display: grid; grid-template-columns: 1fr 300px; gap: 26px; align-items: start; }
-  .bugs { position: sticky; top: 70px; }
+  .target-bar {
+    display: flex; align-items: center; gap: 10px; padding: 10px 16px; border-bottom: 1px solid var(--line);
+    background: var(--bg-1); position: sticky; top: 0; z-index: 5; overflow: hidden;
+  }
+  .target-bar .ttl { font-size: 13.5px; font-weight: 500; white-space: nowrap; }
+  .target-bar .mono { color: var(--tx-2); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+  .wrap {
+    max-width: 980px; margin: 0 auto; padding: 28px 22px 60px;
+    display: grid; grid-template-columns: 1fr 300px; gap: 26px; align-items: start;
+  }
+  .bugs { position: sticky; top: 60px; }
   .bug { border: 1px solid var(--line); background: var(--bg-1); border-radius: 10px; padding: 14px; margin-bottom: 12px; }
   .bug .h { display: flex; align-items: center; gap: 8px; font-size: 12.5px; font-weight: 600; }
   .bug p { color: var(--tx-1); font-size: 12px; line-height: 1.5; margin: 8px 0 0; }
   .bug .try { font-family: var(--mono); font-size: 11px; color: var(--acc); margin-top: 8px; }
-  @media (max-width: 820px){ .wrap { grid-template-columns: 1fr; } .bugs { position: static; } }
+  @media (max-width: 820px) {
+    .wrap { grid-template-columns: 1fr; padding: 18px 16px 40px; }
+    .bugs { position: static; }
+    .target-bar .mono { display: none; }
+  }
 `;

@@ -1,5 +1,5 @@
 {
-  "project-name": "<FILL THIS>",
-  "project-oneliner": "<FILL THIS>",
-  "project-description": "<FILL THIS>"
+  "project-name": "Invariant",
+  "project-oneliner": "Autonomous adversarial QA agent that finds business-logic bugs — and writes the regression test.",
+  "project-description": "Invariant is an autonomous QA agent powered by Claude. Point it at a running web app: it explores the interface, infers the business-logic invariants that must always hold ('a coupon applies once', 'quantity ≥ 1', 'no PAID order without payment'), then relentlessly tries to break each one. When a contradiction is found, it captures the evidence and automatically generates a Playwright regression test — so the bug can never come back. The dashboard includes a live agent mode (real Claude driving a stateful shop through tools, streamed via SSE) and a deterministic demo mode that works without an API key. Three auditable targets ship out of the box: an e-commerce shop, a SaaS billing app, and a banking transfer flow — each with seeded invariant violations."
 }

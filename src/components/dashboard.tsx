@@ -398,7 +398,7 @@ function AuditHero({
 
   return (
     <div className="audit-hero">
-      <div className="audit-card fade-in" style={{ width: 620 }}>
+      <div className="audit-card fade-in" style={{ width: "min(620px, 100%)" }}>
         <span className="pill pill-acc badge">
           <span className="live-dot"></span>Adversarial QA agent
         </span>
@@ -409,7 +409,7 @@ function AuditHero({
         </p>
 
         {/* Target selector */}
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 10, margin: "0 0 16px" }}>
+        <div className="target-grid" style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 10, margin: "0 0 16px" }}>
           {DEMO_TARGET_LIST.map((t) => (
             <div
               key={t.id}

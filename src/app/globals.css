@@ -480,6 +480,7 @@ h1,h2,h3,h4 { margin: 0; font-weight: 600; letter-spacing: -0.02em; line-height:
 
 /* tablet & down: stack the live grid, let the workspace scroll */
 @media (max-width: 1024px) {
+  .target-grid { grid-template-columns: repeat(2, 1fr) !important; }
   .workspace { overflow-y: auto; }
   .live { height: auto; }
   .live-grid { display: flex; flex-direction: column; gap: 14px; }
@@ -533,4 +534,15 @@ h1,h2,h3,h4 { margin: 0; font-weight: 600; letter-spacing: -0.02em; line-height:
   .view-scroll > .panel { overflow-x: auto !important; }
   .tbl th, .tbl td { padding-left: 10px; padding-right: 10px; }
   .test-tabs { overflow-x: auto; flex-wrap: nowrap; }
+
+  /* demo-shop page */
+  .shop-wrap { grid-template-columns: 1fr !important; }
+  .shop-bugs { position: static !important; }
+
+  /* target cards in AuditHero */
+  .target-grid { grid-template-columns: 1fr !important; }
+
+  /* phase stepper wraps on small screens */
+  .run-header { flex-direction: column; align-items: flex-start; }
+  .run-header .row.gap-2 { width: 100%; }
 }
