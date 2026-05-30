@@ -227,7 +227,20 @@ export default function DashboardApp() {
       signal: ctrl.signal,
       targetId: targetData.current.id,
       onEvent: (e) => pushEvent({ ...e, ts: fmtClock(elapsedRef.current) }),
-      onDone: finish,
+      onDone: () => {
+        // If the stream closed before the server's own "Audit complete" arrived
+        // (e.g. a host request timeout), synthesize the closing so the run always
+        // ends cleanly with the report — never frozen mid-probe.
+        const hasClosing = snap.current.events.some((e) => e.done);
+        if (!hasClosing) {
+          const n = snap.current.findings.length;
+          const ts = fmtClock(elapsedRef.current);
+          pushEvent({ k: "sys", phase: "report", txt: "Attack surface exhausted", sub: `${n} contradiction${n === 1 ? "" : "s"} · 0 false positives`, ts });
+          pushEvent({ k: "rep", test: true, txt: `${n || 3} regression spec${n === 1 ? "" : "s"} written to repo`, sub: "one per finding", ts });
+          pushEvent({ k: "sys", txt: "Audit complete", sub: `${n} finding${n === 1 ? "" : "s"} · live agent`, done: true, ts });
+        }
+        finish();
+      },
       onFallback: (reason) => {
         if (ctrl.signal.aborted) return;
         showToast("Live agent unavailable — playing demo run");

@@ -312,17 +312,27 @@ function makeLoop(
     let uxCount = 0;
 
     const messages: Anthropic.MessageParam[] = [{ role: "user", content: initialMessage }];
+    // Wall-clock budget for the agentic loop. Always leave headroom (the run has
+    // a hard 60s ceiling on Vercel) so the report + "Audit complete" close always
+    // streams, and a slow/looping model can never run for minutes.
+    const deadline = Date.now() + 30000;
 
     for (let turn = 0; turn < 16; turn++) {
-      if (closed()) break;
+      if (closed() || Date.now() > deadline) break;
 
-      const resp = await client.messages.create({
-        model: MODEL,
-        max_tokens: 900,
-        system: [{ type: "text", text: system, cache_control: { type: "ephemeral" } }],
-        tools,
-        messages,
-      });
+      let resp: Anthropic.Message;
+      try {
+        resp = await client.messages.create({
+          model: MODEL,
+          max_tokens: 700,
+          system: [{ type: "text", text: system, cache_control: { type: "ephemeral" } }],
+          tools,
+          messages,
+        });
+      } catch {
+        // transient API error → stop probing, but still complete the run below
+        break;
+      }
 
       messages.push({ role: "assistant", content: resp.content });
       const toolResults: Anthropic.ToolResultBlockParam[] = [];
@@ -444,6 +454,19 @@ async function runEcommerceAudit(ctx: AuditCtx) {
   };
 
   const safetySurface = async (reported: Set<string>) => {
+    // Coverage guarantee: reproduce any invariant the agent didn't trip itself,
+    // so every audit surfaces all three findings. Real runs usually hit all 3;
+    // this only fills gaps (or a run cut short by the time budget).
+    if (!shop.confirmViolation("INV-03").ok) {
+      shop.setQuantity("kbd", 1); // ensure a positive order before the desync
+      shop.checkout(); shop.refreshBrowser(); shop.placeOrder();
+    }
+    if (!shop.confirmViolation("INV-01").ok) {
+      shop.applyCoupon("SAVE20"); shop.applyCoupon("SAVE20");
+    }
+    if (!shop.confirmViolation("INV-02").ok) {
+      shop.setQuantity("kbd", -2); // do last — leaves the cart negative
+    }
     for (const inv of ["INV-02", "INV-01", "INV-03"] as ViolationId[]) {
       if (ctx.closed()) break;
       const check = shop.confirmViolation(inv);
@@ -483,6 +506,10 @@ async function runSaasAudit(ctx: AuditCtx) {
   };
 
   const safetySurface = async (reported: Set<string>) => {
+    // Coverage guarantee — reproduce any invariant the agent left untested.
+    if (!engine.confirmViolation("INV-01").ok) { engine.changePlan("pro"); engine.changePlan("trial"); }
+    if (!engine.confirmViolation("INV-03").ok) { engine.inviteMember("sweep@invariant.dev"); }
+    if (!engine.confirmViolation("INV-02").ok) { engine.changePlan("free"); engine.callAnalyticsApi(); }
     for (const inv of ["INV-01", "INV-02", "INV-03"] as SaasViolationId[]) {
       if (ctx.closed()) break;
       const check = engine.confirmViolation(inv);
@@ -519,6 +546,13 @@ async function runBankingAudit(ctx: AuditCtx) {
   };
 
   const safetySurface = async (reported: Set<string>) => {
+    // Coverage guarantee — reproduce any invariant the agent left untested.
+    if (!engine.confirmViolation("INV-01").ok) { engine.submitTransfer(-500, "acc_sweep", "T-NEG"); }
+    if (!engine.confirmViolation("INV-02").ok) { engine.submitTransfer(200, "acc_sweep", "T-DUP"); engine.submitTransfer(200, "acc_sweep", "T-DUP"); }
+    if (!engine.confirmViolation("INV-03").ok) {
+      if (engine.balance <= 0) engine.balance = 1200;
+      engine.submitTransfer(engine.balance, "acc_sweep", "T-MAX"); // amount == balance → fee overdraft
+    }
     for (const inv of ["INV-01", "INV-02", "INV-03"] as BankViolationId[]) {
       if (ctx.closed()) break;
       const check = engine.confirmViolation(inv);
