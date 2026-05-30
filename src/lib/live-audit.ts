@@ -41,6 +41,8 @@ export async function runLiveAudit({ signal, targetId = "ecommerce", onEvent, on
   const decoder = new TextDecoder();
   let buf = "";
   let sawDone = false;
+  let eventCount = 0;
+  let sawViolation = false;
 
   const processFrame = (frame: string): "fallback" | void => {
     const line = frame.split("\n").find((l) => l.startsWith("data:"));
@@ -56,6 +58,8 @@ export async function runLiveAudit({ signal, targetId = "ecommerce", onEvent, on
       return "fallback";
     }
     onEvent(e);
+    eventCount++;
+    if (e.k === "viol") sawViolation = true;
     if (e.done) sawDone = true;
   };
 
@@ -74,17 +78,26 @@ export async function runLiveAudit({ signal, targetId = "ecommerce", onEvent, on
     }
   } catch (e) {
     if (signal.aborted) return;
-    if (!sawDone) {
+    // If we never received any sustantive data, surface the error.
+    if (eventCount === 0) {
       onFallback(e instanceof Error ? e.message : "stream error");
       return;
     }
+    // Otherwise fall through — the run already produced data the user is seeing.
   }
 
   // Flush any event that arrived without a trailing \n\n before the stream closed.
-  if (!sawDone && buf.trim()) {
+  if (buf.trim()) {
     if (processFrame(buf) === "fallback") return;
   }
 
-  if (sawDone) onDone();
+  // Treat the run as completed if:
+  //   • the server sent its explicit "done" event, OR
+  //   • the agent already produced findings / a meaningful amount of events
+  //     (covers Vercel's 60s function timeout cutting the stream after the bugs
+  //     were found but before the closing "Audit complete" event). In that case
+  //     we must NOT restart the demo, since the user already sees real findings.
+  const lookedLikeRealRun = sawViolation || eventCount >= 6;
+  if (sawDone || lookedLikeRealRun) onDone();
   else onFallback("stream ended early");
 }
